@@ -4,6 +4,16 @@ const googleAuth = require('./lib/google-auth');
 const queries = require('./config');
 const queryToSheet = require('./lib/query-to-sheet');
 
+
+const createBatches = (queries, batchSize) => {
+  const batches = [];
+  for (let i = 0; i < queries.length; i += batchSize) {
+    batches.push(queries.slice(i, i + batchSize));
+  }
+  return batches;
+};
+
+
 (async () => {
   try {
     const googleSheets = google.sheets({
@@ -16,14 +26,12 @@ const queryToSheet = require('./lib/query-to-sheet');
       await Promise.all(batch.map(queryToSheet(googleSheets)));
     };
 
-    // Split queries into batches of 50
-    // API says 60 a minute but still beem to be getting throttled
     const batchSize = 50;
-    for (let i = 0; i < queries.length; i += batchSize) {
-      const batch = queries.slice(i, i + batchSize);
+    const batches = createBatches(queries, batchSize);
+
+    for (const batch of batches) {
       await processBatch(batch);
-      if (i + batchSize < queries.length) {
-        // Wait for 70 seconds before processing the next batch
+      if (batch !== batches[batches.length - 1]) {
         await new Promise(resolve => setTimeout(resolve, 70000));
       }
     }
